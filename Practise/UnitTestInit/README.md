@@ -1,16 +1,15 @@
-
-# Spring Boot Unit Test 
+# Spring Boot 單元測試（Unit Test）練習指南
 
 🎯 **目標：**
 - 建立空的 Spring Boot 專案
-- 建立簡單 Component / Service
-- 寫 Unit Test 測試 Service 功能
+- 建立簡單的 Component / Service
+- 寫單元測試驗證 Service 功能
 
 ---
 
 ## Step 0. 前置準備
 
-在 `pom.xml` 加上 Spring Boot Starter 與測試套件：
+專案採用 [Maven](https://maven.apache.org/) 作為建構工具，請在 `pom.xml` 加入 Spring Boot Starter 與測試相關套件：
 
 ```xml
 <dependencies>
@@ -20,14 +19,16 @@
         <artifactId>spring-boot-starter</artifactId>
     </dependency>
 
-    <!-- Spring Boot Test -->
+    <!-- Spring Boot 測試套件 -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-test</artifactId>
         <scope>test</scope>
     </dependency>
+    
 </dependencies>
 ```
+> 測試套件統一採用 `spring-boot-starter-test`，所有依賴皆由 Maven 管理。
 
 ---
 
@@ -77,7 +78,7 @@ public class UserService {
 
 ---
 
-## Step 3. 建立 Unit Test
+## Step 3. 撰寫單元測試
 
 ```java
 import org.junit.jupiter.api.Test;
@@ -101,26 +102,27 @@ public class UserServiceTest {
         UserResponse res = userService.calculateAge(req);
 
         assertEquals("Alice", res.getName());
-        assertEquals(Year.now().getValue() - 2000, res.getAge());
+        assertEquals(java.time.Year.now().getValue() - 2000, res.getAge());
     }
 }
 ```
+> 已掛載 `spring-boot-starter-test`，可直接啟動 Spring Context 並測試 Service 功能。
 
 ---
 
 ## Step 4. 驗收練習成果
 
 - Service 可計算年齡並回傳 Response
-- Unit Test 可啟動 Spring Context，並驗證結果正確
-- 這套流程可以直接套用到新建 Component / Service
+- 單元測試可啟動 Spring Context 並驗證結果正確
+- 此流程可直接應用至新建的 Component / Service
 
 ---
 
-## 自我檢驗清單 ✅
+## 自我檢查清單 ✅
 
 - [ ] 能在 Spring Boot 專案中建立 Service
 - [ ] 能建立 Request / Response DTO
-- [ ] 能撰寫 Unit Test 測試 Service 方法
+- [ ] 能撰寫單元測試驗證 Service 方法
 - [ ] 能用 assert 驗證 Service 回傳結果
 - [ ] 能成功啟動 Spring Context 並執行測試
-- [ ] 能將流程套用到新建 Component / Service 上
+- [ ] 能將此流程套用到新建 Component / Service
