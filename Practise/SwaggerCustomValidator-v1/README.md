@@ -1,104 +1,154 @@
-# Spring Boot Enum Name 驗證 Lab
+# Spring Boot 自訂複合條件 Validator Lab
 
 ## Lab 目標
 
-- 學習如何設計 API 以 Swagger 方式文件化，接收 JSON body，並驗證 JSON 中的 enum 欄位值是否正確（名稱）。
-- 練習主要程式片段的撰寫，並透過查詢 Spring Boot 及 Swagger 官方或權威資源自行完成細節。
-- 以單元測試驗證你設計的 enum 驗證機制是否正確。
+- 學習如何在 Spring Boot 中設計複合條件的自訂 Validator，驗證多個欄位（如生日、年齡、Email domain）是否符合規則。
+- 練習將驗證邏輯放在 Request 物件中，並透過 Swagger UI 測試表單提交及回傳狀態。
+- 使用單元測試驗證自訂 Validator 的正確性。
 
 ---
 
 ## 操作步驟
 
-### 步驟 1：宣告業務用 Enum 類別（如狀態）
+### 步驟 1：建立 Request 物件
 
-> 主要片段
 ```java
-public enum StatusEnum {
-    ACTIVE, INACTIVE, SUSPENDED
+@Data
+public class UserRequest {
+
+    @NotBlank(message = "Name cannot be blank")
+    private String name;
+
+    @Email(message = "Invalid email format")
+    private String email;
+
+    @ValidBirthday
+    private String birthday; // yyyy-MM-dd
 }
 ```
 
----
-
-### 步驟 2：設計驗證工具類
-
-> 主要片段
-```java
-public static boolean isValidEnumName(Class<? extends Enum<?>> enumClass, String value) {
-    if (value == null) return false;
-    return Arrays.stream(enumClass.getEnumConstants()).anyMatch(e -> e.name().equals(value));
-}
-```
+> 這裡將驗證註解放在 Request class，各參數自動套用。
 
 ---
 
-### 步驟 3：建立 API Body 對應的請求物件
+### 步驟 2：建立 Controller
 
-> 主要片段
 ```java
-public class StatusReq {
-    private String status;
-    // getter, setter
-}
-```
-> 需加上 Swagger 註解（參考下方資源）
+@RestController
+@RequestMapping("/user")
+public class UserController {
 
----
-
-### 步驟 4：Controller 驗證並回應
-
-> 主要片段
-```java
-@PostMapping("/status")
-public ResponseEntity<?> setStatus(@RequestBody StatusReq req) {
-    if (!isValidEnumName(StatusEnum.class, req.getStatus())) {
-        return ResponseEntity.badRequest().body(Map.of("success", false, "message", "status 欄位錯誤"));
+    @PostMapping("/register")
+    public ResponseEntity<String> register(@Valid @ModelAttribute UserRequest request) {
+        return ResponseEntity.ok("User registered successfully");
     }
-    return ResponseEntity.ok(Map.of("success", true, "status", req.getStatus()));
 }
 ```
-> 需加上 Swagger 的 API Operation、參數說明註解（參考下方資源）
+
+> 使用 @ModelAttribute 從 UI 或 Swagger 表單綁定參數，驗證自動套用。
 
 ---
 
-### 步驟 5：Swagger UI 介接
+### 步驟 3：建立自訂 Validator
 
-- 依官方/社群教學設定，讓 Swagger UI 能正確顯示 API 文件與 Body 格式。
-- 測試正確及錯誤情境。
+#### Annotation
+
+```java
+@Constraint(validatedBy = BirthdayValidator.class)
+@Target({ ElementType.FIELD })
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ValidBirthday {
+    String message() default "Birthday must be before today and age >= 18";
+}
+```
+
+#### Validator Class 主要邏輯
+
+```java
+public class BirthdayValidator implements ConstraintValidator<ValidBirthday, String> {
+
+    @Override
+    public boolean isValid(String birthdayStr, ConstraintValidatorContext context) {
+        if (birthdayStr == null || birthdayStr.isEmpty()) return true;
+        LocalDate birthday = LocalDate.parse(birthdayStr);
+        if (!birthday.isBefore(LocalDate.now()) || Period.between(birthday, LocalDate.now()).getYears() < 18) {
+            return false;
+        }
+        return true;
+    }
+}
+```
+
+> 可以擴展檢查其他複合條件，例如 Email domain。
+
+---
+
+### 步驟 4：配置 Swagger UI
+
+```properties
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+```
+
+- 啟動專案 → 打開 http://localhost:8080/swagger-ui.html 測試 /user/register API。
+
+---
+
+### 步驟 5：測試案例
+
+**Case 1: 符合條件 → 200 OK**
+
+```
+name=Alice
+email=alice@example.com
+birthday=2000-01-01
+```
+
+**Case 2: 違反條件 → 400 Bad Request**
+
+```
+name=Bob
+email=bob@example.com
+birthday=2999-01-01
+```
+
+- 回傳訊息示例: `Birthday must be before today and age >= 18`
 
 ---
 
 ### 步驟 6：單元測試驗證
 
-> 主要測試片段
+主要測試片段：
 
 ```java
-    @Test
-    void validStatus_shouldReturnSuccess() {
-    //...
-    } // status = "ACTIVE"
-    @Test
-    void invalidStatus_shouldReturnError() {
-        //...
-    }  // status = "INVALID"
-    @Test
-    void missingStatus_shouldReturnError() {
-        //...
-    } // status = null
+@Test
+void validUser_shouldReturnSuccess() {
+    // 使用 MockMvc 或 WebTestClient 測試合法資料
+}
+
+@Test
+void invalidBirthday_shouldReturnError() {
+    // 測試生日違規，期望 400
+}
+
+@Test
+void missingName_shouldReturnError() {
+    // 測試 Name 為空，期望 400
+}
 ```
-> 需查詢如何使用 Spring Boot 測試 API（MockMvc）
+
+> 查詢如何使用 Spring Boot 測試 API（MockMvc / WebTestClient）
 
 ---
 
 ## Checklist
 
-- [ ] Enum 類別宣告正確
-- [ ] 驗證工具能判斷 enum name 合法性
-- [ ] Controller 可正確驗證並回傳格式化訊息
-- [ ] Swagger UI 能顯示 API 並測試各情境
-- [ ] 單元測試覆蓋有效、無效、缺少欄位情境
-- [ ] 測試驗證機制成功
+- Request 物件各參數驗證註解正確
+- 自訂 Validator 能檢查複合條件（生日、年齡、可擴展其他條件）
+- Controller 能正確接收 Request 並回傳格式化訊息
+- Swagger UI 能顯示 API 並測試各情境
+- 單元測試覆蓋合法、違規、缺少欄位情境
+- 測試驗證機制成功
 
 ---
 
@@ -106,13 +156,13 @@ public ResponseEntity<?> setStatus(@RequestBody StatusReq req) {
 
 - [Spring Boot + Swagger 3 Example (OpenAPI 3)](https://www.bezkoder.com/spring-boot-swagger-3/)
 - [Spring Boot Swagger 中文教學（Blog）](https://chikuwa-tech-study.blogspot.com/2021/07/spring-boot-swagger-openapi-documentation.html)
-- [如何用 SpringDoc OpenAPI 處理 Enum 格式（StackOverflow）](https://stackoverflow.com/questions/68747036/how-can-have-springdoc-openapi-use-the-jsonvalue-enum-format-without-changing-t)
-- [SpringBoot 集成 Swagger UI 顯示 Json 格式說明（CSDN）](https://blog.csdn.net/JingAi_jia917/article/details/136626438)
+- [Spring Boot Validation 官方文件](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-validation)
+- [SpringDoc OpenAPI 教學](https://springdoc.org/)
 
 ---
 
 ## Lab 補充
 
-- 請只根據主要片段自行查詢並補完細節（如 Swagger 註解、單元測試、Spring Boot 專案設定等）。
-- 建議將 enum 驗證工具抽成公用方法或元件，便於日後擴充。
-- 完成 checklist 並通過所有單元測試即表示練習完成。
+- 請根據主要片段自行查詢並補完細節（如 Swagger 註解、單元測試、專案設定等）。
+- 可擴展更多複合條件或共用驗證工具，方便日後套用。
+- 完成 checklist 並通過單元測試即表示練習完成。  
