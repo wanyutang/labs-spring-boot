@@ -27,7 +27,7 @@ public class HelloController {
     @PostMapping("/greet")
     @Operation(summary = "自訂問候", description = "使用請求體中的資訊創建自訂問候")
     public GreetingResponse greet(@RequestBody GreetingRequest request) {
-        return new GreetingResponse("Hello, " + request.getName() + "! " + request.getMessage());
+        return new GreetingResponse("Hello, " + request.name() + "! " + request.message());
     }
 
     public record GreetingRequest(String name, String message) {}
